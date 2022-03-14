@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import os
 
 
-epsilons = [0, .05, .1, .15, .2, .25, .3]
+epsilons = [0, 0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15]
 pretrained_model = "data/lenet_mnist_model.pth"
 use_cuda=True
 
@@ -34,7 +34,7 @@ class Net(nn.Module):
 
 #声明 MNIST 测试数据集何数据加载
 test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('./data', train=False, download=True, transform=transforms.Compose([
+    datasets.MNIST('./data', train=True, download=True, transform=transforms.Compose([
             transforms.ToTensor(),
             ])),
         batch_size=1, shuffle=True)
@@ -52,15 +52,15 @@ model.load_state_dict(torch.load(pretrained_model, map_location='cpu'))
 # 在评估模式下设置模型。在这种情况下，这适用于Dropout图层
 model.eval()
 unloader = transforms.ToPILImage()
-def save_image(tensor,num,target):
-    dir = 'results2'
+def save_image(tensor,num,target,e):
+    dir = ('results{}'.format(e))
     image = tensor.cpu().clone()  # we clone the tensor to not do changes on it
     image = image.squeeze(0)  # remove the fake batch dimension
     image = unloader(image)
     if not os.path.exists(dir):
         os.makedirs(dir)
-    image.save('results2/{}.jpg'.format(num))
-    with open("results2/test.txt","a") as f:
+    image.save('results{}/{}.jpg'.format(e,num))
+    with open("results{}/test.txt".format(e),"a") as f:
         f.write("{}.jpg {}\n".format(num,target))
 
 def fgsm_attack(image, epsilon, data_grad):
@@ -112,28 +112,19 @@ def test( model, device, test_loader, epsilon ):
         # 唤醒FGSM进行攻击
         perturbed_data = fgsm_attack(data, epsilon, data_grad)
         
-        save_image(perturbed_data,step,target.item())
+        save_image(perturbed_data,step,target.item(),epsilon)
    
-        # 重新分类受扰乱的图像
-        # output = model(perturbed_data)
+        #重新分类受扰乱的图像
+        output = model(perturbed_data)
+        correct =0
+        #检查是否成功
+        final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+        if final_pred.item()==target.item():
+            correct +=1
 
-        # 检查是否成功
-        # final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-        # if final_pred.item() == target.item():
-        #     correct += 1
-        #     # 保存0 epsilon示例的特例
-        #     if (epsilon == 0) and (len(adv_examples) < 5):
-        #         adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-        #         adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
-        # else:
-        #     # 稍后保存一些用于可视化的示例
-        #     if len(adv_examples) < 5:
-        #         adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-        #         adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
-
-    # 计算这个epsilon的最终准确度
-    # final_acc = correct/float(len(test_loader))
-    # print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(test_loader), final_acc))
+    #计算这个epsilon的最终准确度
+    final_acc = correct/float(len(test_loader))
+    print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(test_loader), final_acc))
 
     # 返回准确性和对抗性示例
     print("I have finished the mission!")
@@ -157,7 +148,7 @@ def verify(model, loader):
         res=correct/all
     return res
 
-test(model, device, test_loader, 0.2)
+
 #print(verify(model,combine))
 
 
